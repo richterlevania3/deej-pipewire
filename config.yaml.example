@@ -1,0 +1,43 @@
+# deej configuration — copy to config.yaml and edit.
+#
+# process names are case-insensitive and match the audio stream's process
+# binary as PipeWire/PulseAudio reports it.
+#   master           -> the master output channel
+#   mic              -> default recording device input level
+#   deej.current     -> the currently-focused window
+#   deej.unmapped    -> every app not bound to another slider
+# a list of names creates a group controlled by one slider.
+#
+# important: slider indexes start at 0, regardless of which analog pins you use.
+slider_mapping:
+  0: master
+  1: firefox
+  2: some-media-player      # e.g. a flatpak's runtime process name
+  3: deej.current
+  4: deej.unmapped
+
+# invert if your sliders read backwards (top = 0%, bottom = 100%)
+invert_sliders: false
+
+# arduino serial connection
+# linux: usually /dev/ttyUSB0 (CH340 boards) or /dev/ttyACM0 (Pro Micro)
+com_port: /dev/ttyUSB0
+baud_rate: 9600
+
+# --- fader taper (this fork) --------------------------------------------------
+# PulseAudio's raw volume scale is cubic in amplitude, so a plain linear fader
+# spends most of its travel nearly silent. volume_curve pre-shapes the value
+# (raw = position ^ curve) for roughly perceptually-even travel.
+#   1.0 = stock (cubic) behaviour   0.6 ≈ even loudness   lower = more low-end range
+volume_curve: 0.6
+
+# --- fader step size / jitter gate --------------------------------------------
+# deej ignores movements smaller than this threshold before updating volume:
+#   high=3.5%   default=2.5%   low=1.5%   fine=1% (this fork)
+# "fine" gives 1% steps but needs a smoothed sketch (the bundled
+# deej-5-sliders-vanilla oversamples 16x) so pot noise doesn't leak through.
+noise_reduction: fine
+
+# how often deej rescans audio sessions, in seconds (this fork adds fast detection)
+session_refresh_interval: 10
+fast_session_detection: true

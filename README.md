@@ -19,6 +19,37 @@ This is a custom build of [Deej](https://github.com/omriharel/deej) with enhance
 - **Performance Optimizations**: Reduced unnecessary session scans and improved efficiency
 - **Advanced Configuration**: Extended config options for fine-tuning behavior
 
+### Linux / PipeWire desktop additions (this fork)
+- **Pause-on-mute companion** (`pause-watcher.py`): sliding an app to 0% pauses
+  it via MPRIS; sliding back up resumes it. Works with High Tide, Firefox,
+  Stremio, mpv, VLC, Spotify, etc. — and reacts in ~70 ms. See below.
+- **Perceptually-even fader taper** (`volume_curve`): compensates for
+  PulseAudio's cubic volume scale so a linear fader feels linear.
+- **1% fader granularity** (`noise_reduction: fine`) paired with a 16×
+  oversampling Arduino sketch to keep pot jitter out.
+- **Headless**: builds and runs with no GTK/AppIndicator tray dependency.
+- **systemd user services** for the daemon and the pause-watcher in
+  [`contrib/systemd/`](contrib/systemd/).
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list. All new options are
+documented in [`config.yaml.example`](config.yaml.example).
+
+## 🔊 Pause-on-mute companion
+
+`pause-watcher.py` watches PipeWire stream volumes and pauses/resumes any app's
+MPRIS media player when its volume hits zero / comes back. It uses only `pactl`
+and `gdbus` (no Python dependencies) and only ever auto-resumes what it paused,
+so manual pauses are respected.
+
+```bash
+# run directly
+python3 pause-watcher.py
+
+# or as a systemd user service (auto-start, auto-restart)
+cp contrib/systemd/deej-pause-watcher.service ~/.config/systemd/user/
+systemctl --user enable --now deej-pause-watcher.service
+```
+
 ## 🔧 What's Fixed
 
 This build addresses the common issue where Deej crashes with EOF errors when:
@@ -170,13 +201,20 @@ This is a fork of the original Deej project. If you find issues or want to contr
 
 ## 📄 License
 
-This project is based on the original Deej project. See the [original LICENSE](https://github.com/omriharel/deej/blob/master/LICENSE) for details.
+MIT — Copyright (c) 2020 Omri Harel, and contributors to this fork. See
+[`LICENSE`](LICENSE) for the full text. All additions in this fork (the
+pause-watcher, `volume_curve`, the `fine` noise-reduction level, the oversampling
+sketch change, and the packaging files) are released under the same MIT License.
+
+### Fork lineage
+[omriharel/deej](https://github.com/omriharel/deej) → [bagel88/deej-pipewire](https://github.com/bagel88/deej-pipewire) → this fork.
 
 ## 🙏 Acknowledgments
 
 - Original Deej project by [omriharel](https://github.com/omriharel)
+- PipeWire port and serial-recovery base by [bagel88](https://github.com/bagel88/deej-pipewire)
 - Serial error recovery fix inspired by [PR #150](https://github.com/omriharel/deej/pull/150)
-- Session management improvements and performance optimizations developed collaboratively
+- Linux desktop additions (pause-watcher, fader taper, 1% granularity, headless build) in this fork
 
 ## 🔗 Links
 

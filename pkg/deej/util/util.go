@@ -87,6 +87,7 @@ func SignificantlyDifferent(old float32, new float32, noiseReductionLevel string
 	const (
 		noiseReductionHigh = "high"
 		noiseReductionLow  = "low"
+		noiseReductionFine = "fine"
 	)
 
 	// this threshold is solely responsible for dealing with hardware interference when
@@ -101,6 +102,11 @@ func SignificantlyDifferent(old float32, new float32, noiseReductionLevel string
 		break
 	case noiseReductionLow:
 		significantDifferenceThreshold = 0.015
+		break
+	case noiseReductionFine:
+		// 0.005 sits below one NormalizeScalar step (0.01), so every 1% change
+		// registers — needs the smoothed Arduino sketch to avoid pot jitter
+		significantDifferenceThreshold = 0.005
 		break
 	default:
 		significantDifferenceThreshold = 0.025

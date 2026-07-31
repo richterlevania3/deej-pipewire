@@ -1,6 +1,7 @@
 package deej
 
 import (
+	"math"
 	"errors"
 	"fmt"
 
@@ -11,6 +12,9 @@ import (
 
 // normal PulseAudio volume (100%)
 const maxVolume = 0x10000
+
+// gives roughly perceptually-linear fader travel (amplitude ~ x^1.8)
+const defaultVolumeCurve = 0.6
 
 var errNoSuchProcess = errors.New("No such process")
 
@@ -203,11 +207,30 @@ func (s *masterSession) String() string {
 	return fmt.Sprintf(sessionStringFormat, s.humanReadableDesc, s.GetVolume())
 }
 
+// PulseAudio's volume scale is cubic in amplitude: a raw value of 50% is only
+// -18 dB, so a linear slider spends most of its travel almost inaudible and
+// dumps the rest of the range into the last third. volumeCurve pre-shapes the
+// slider value (raw = v^curve) so travel maps to roughly even perceived
+// loudness; 1.0 restores stock behaviour, lower gives the bottom more range.
+var volumeCurve = defaultVolumeCurve
+
+func setVolumeCurve(curve float64) {
+	if curve <= 0 || curve > 4 {
+		curve = defaultVolumeCurve
+	}
+	volumeCurve = curve
+}
+
 func createChannelVolumes(channels byte, volume float32) []uint32 {
 	volumes := make([]uint32, channels)
 
+	shaped := float64(volume)
+	if shaped > 0 && volumeCurve != 1.0 {
+		shaped = math.Pow(shaped, volumeCurve)
+	}
+
 	for i := range volumes {
-		volumes[i] = uint32(volume * maxVolume)
+		volumes[i] = uint32(shaped * maxVolume)
 	}
 
 	return volumes

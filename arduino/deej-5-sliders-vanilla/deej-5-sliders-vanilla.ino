@@ -19,8 +19,15 @@ void loop() {
 }
 
 void updateSliderValues() {
+  // oversample each slider to suppress ADC/pot jitter, so deej's fine (1%)
+  // noise-reduction threshold doesn't pass electrical noise as real movement
+  const int SAMPLES = 16;
   for (int i = 0; i < NUM_SLIDERS; i++) {
-     analogSliderValues[i] = analogRead(analogInputs[i]);
+     long sum = 0;
+     for (int s = 0; s < SAMPLES; s++) {
+        sum += analogRead(analogInputs[i]);
+     }
+     analogSliderValues[i] = sum / SAMPLES;
   }
 }
 

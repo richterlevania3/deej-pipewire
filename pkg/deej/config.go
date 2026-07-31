@@ -68,6 +68,7 @@ const (
 	configKeySessionRefreshInterval    = "session_refresh_interval"
 	configKeyMaxSessionRefreshInterval = "max_session_refresh_interval"
 	configKeyFastSessionDetection      = "fast_session_detection"
+	configKeyVolumeCurve               = "volume_curve"
 
 	defaultCOMPort  = "COM4"
 	defaultBaudRate = 9600
@@ -109,6 +110,7 @@ func NewConfig(logger *zap.SugaredLogger, notifier Notifier) (*CanonicalConfig, 
 	userConfig.SetDefault(configKeySessionRefreshInterval, 30)
 	userConfig.SetDefault(configKeyMaxSessionRefreshInterval, 45)
 	userConfig.SetDefault(configKeyFastSessionDetection, false)
+	userConfig.SetDefault(configKeyVolumeCurve, defaultVolumeCurve)
 
 	internalConfig := viper.New()
 	internalConfig.SetConfigName(internalConfigName)
@@ -258,6 +260,7 @@ func (cc *CanonicalConfig) populateFromVipers() error {
 
 	cc.InvertSliders = cc.userConfig.GetBool(configKeyInvertSliders)
 	cc.NoiseReductionLevel = cc.userConfig.GetString(configKeyNoiseReductionLevel)
+	setVolumeCurve(cc.userConfig.GetFloat64(configKeyVolumeCurve))
 	cc.PeriodicUpdateInterval = cc.userConfig.GetInt(configKeyPeriodicUpdateInterval)
 	cc.DetectExternalChanges = cc.userConfig.GetBool(configKeyDetectExternalChanges)
 	cc.SessionRefreshInterval = cc.userConfig.GetInt(configKeySessionRefreshInterval)

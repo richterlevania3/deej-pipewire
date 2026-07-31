@@ -1,0 +1,13 @@
+[Unit]
+Description=deej hardware volume mixer
+After=pipewire-pulse.service
+Wants=pipewire-pulse.service
+
+[Service]
+WorkingDirectory=%h/deej-pipewire
+ExecStart=%h/deej-pipewire/deej
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
