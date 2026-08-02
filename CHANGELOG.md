@@ -29,6 +29,22 @@ A new noise-reduction level with a 0.5% threshold (below one 1% step), so every
 1% of movement registers. The bundled Arduino sketch oversamples each slider
 16× to suppress ADC/pot jitter, so the finer gate doesn't pass electrical noise.
 
+### Event-driven volume re-assert on new streams
+deej now subscribes to PulseAudio sink-input events and re-applies the mapped
+slider volume the instant a **new** stream appears, instead of waiting for the
+next poll. This fixes apps that spawn a fresh audio stream at their own default
+volume on certain actions (e.g. Firefox recreating its stream on tab focus /
+audio restart) — previously the volume stayed wrong until the next poll or a
+manual slider nudge. Only *new*-stream events are acted on (change/remove are
+ignored) so deej's own volume writes don't feed back into a loop; bursts are
+coalesced over 120 ms.
+
+Companion fix: `GetVolume()` now inverts the `volume_curve` taper so volumes read
+back in the same space they're set in. Without this the change-detection
+comparison never matched the (curved) stored value, so deej re-wrote every
+session on every cycle and couldn't distinguish a real external change from its
+own output.
+
 ### Headless operation
 The system-tray integration is stubbed out so the daemon builds and runs with no
 GTK/AppIndicator dependencies. Stop it with Ctrl+C or `SIGTERM` (or run it under

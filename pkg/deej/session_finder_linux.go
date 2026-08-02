@@ -74,6 +74,53 @@ func (sf *paSessionFinder) GetAllSessions() ([]Session, error) {
 	return sessions, nil
 }
 
+// PulseAudio subscription bit for sink inputs, and the facility field encoded
+// in a SubscribeEvent (see pulse/def.h PA_SUBSCRIPTION_*). Not exported by the
+// jfreymuth/pulse proto package, so defined here.
+const (
+	paSubscriptionMaskSinkInput  = 0x0004
+	paSubscriptionEventFacility  = 0x000F
+	paSubscriptionEventSinkInput = 0x0002
+	paSubscriptionEventType      = 0x0030
+	paSubscriptionEventNew       = 0x0000
+)
+
+// SubscribeToSinkInputEvents asks pipewire-pulse to notify us whenever a sink
+// input (application stream) appears, changes, or goes away, and returns a
+// channel that ticks once per such event. deej uses this to re-apply the mapped
+// slider volume the instant an app spawns a new stream (e.g. Firefox on tab
+// focus / audio restart), rather than waiting for the next poll.
+func (sf *paSessionFinder) SubscribeToSinkInputEvents() (chan struct{}, error) {
+	events := make(chan struct{}, 1)
+
+	// the proto client calls Callback on its read loop for every unsolicited
+	// message; we only act on sink-input SubscribeEvents. Non-blocking send so
+	// we never stall that loop (the caller coalesces bursts anyway).
+	sf.client.Callback = func(msg interface{}) {
+		if evt, ok := msg.(*proto.SubscribeEvent); ok {
+			// only react to NEW sink inputs. change/remove events include the
+			// ones our own SetVolume triggers, which would otherwise feed back
+			// into an endless re-assert loop.
+			if evt.Event&paSubscriptionEventFacility == paSubscriptionEventSinkInput &&
+				evt.Event&paSubscriptionEventType == paSubscriptionEventNew {
+				select {
+				case events <- struct{}{}:
+				default:
+				}
+			}
+		}
+	}
+
+	if err := sf.client.Request(&proto.Subscribe{Mask: paSubscriptionMaskSinkInput}, nil); err != nil {
+		sf.logger.Warnw("Failed to subscribe to sink input events", "error", err)
+		return nil, fmt.Errorf("subscribe to sink input events: %w", err)
+	}
+
+	sf.logger.Debug("Subscribed to PulseAudio sink-input events")
+
+	return events, nil
+}
+
 func (sf *paSessionFinder) Release() error {
 	if err := sf.conn.Close(); err != nil {
 		sf.logger.Warnw("Failed to close PulseAudio connection", "error", err)

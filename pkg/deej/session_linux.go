@@ -243,5 +243,15 @@ func parseChannelVolumes(volumes []uint32) float32 {
 		level += volume
 	}
 
-	return float32(level) / float32(len(volumes)) / float32(maxVolume)
+	raw := float64(level) / float64(len(volumes)) / float64(maxVolume)
+
+	// invert the write-side taper (createChannelVolumes applies raw = v^curve) so
+	// volumes read back in the same slider space we set them in — otherwise the
+	// GetVolume() != sliderValue comparisons never match and deej re-writes every
+	// cycle and can't tell a real external change from its own curved value.
+	if raw > 0 && volumeCurve != 1.0 {
+		raw = math.Pow(raw, 1.0/volumeCurve)
+	}
+
+	return float32(raw)
 }

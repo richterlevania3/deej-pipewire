@@ -147,6 +147,12 @@ func (sf *wcaSessionFinder) GetAllSessions() ([]Session, error) {
 	return sessions, nil
 }
 
+// SubscribeToSinkInputEvents is not implemented on Windows; deej falls back to
+// polling there.
+func (sf *wcaSessionFinder) SubscribeToSinkInputEvents() (chan struct{}, error) {
+	return nil, fmt.Errorf("sink input event subscription not supported on windows")
+}
+
 func (sf *wcaSessionFinder) Release() error {
 
 	// skip unregistering the mmnotificationclient, as it's not implemented in go-wca

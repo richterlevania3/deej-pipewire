@@ -70,8 +70,74 @@ func (m *sessionMap) initialize() error {
 	m.setupOnSliderMove()
 	m.setupPeriodicVolumeUpdates()
 	m.setupAutomaticSessionRefresh()
+	m.setupOnSinkInputEvent()
 
 	return nil
+}
+
+// setupOnSinkInputEvent reacts to PulseAudio sink-input events (a stream being
+// created/changed/removed) by immediately re-applying the current slider volumes.
+// This closes the gap where an app spawning a fresh stream (e.g. Firefox on tab
+// focus) would keep its default volume until the next poll or a manual slider move.
+func (m *sessionMap) setupOnSinkInputEvent() {
+	events, err := m.sessionFinder.SubscribeToSinkInputEvents()
+	if err != nil {
+		m.logger.Warnw("Not subscribing to sink-input events; polling only", "error", err)
+		return
+	}
+
+	go func() {
+		for range events {
+			// coalesce the burst an app fires when it (re)creates streams, then
+			// re-assert once against the freshly-enumerated session map.
+			time.Sleep(120 * time.Millisecond)
+			for draining := true; draining; {
+				select {
+				case <-events:
+				default:
+					draining = false
+				}
+			}
+
+			m.logger.Debug("Sink-input event: re-asserting mapped volumes")
+			m.refreshSessions(true)
+			m.applyCurrentSliderVolumes()
+		}
+	}()
+}
+
+// applyCurrentSliderVolumes pushes the latest slider values onto all mapped
+// sessions currently in the map (no slider movement required).
+func (m *sessionMap) applyCurrentSliderVolumes() {
+	currentValues := m.deej.serial.GetCurrentSliderValues()
+	if currentValues == nil {
+		return
+	}
+
+	for sliderIdx, percentValue := range currentValues {
+		targets, ok := m.deej.config.SliderMapping.get(sliderIdx)
+		if !ok {
+			continue
+		}
+
+		for _, target := range targets {
+			for _, resolvedTarget := range m.resolveTarget(target) {
+				sessions, ok := m.get(resolvedTarget)
+				if !ok {
+					continue
+				}
+
+				for _, session := range sessions {
+					if util.SignificantlyDifferent(session.GetVolume(), percentValue, m.deej.config.NoiseReductionLevel) {
+						if err := session.SetVolume(percentValue); err != nil {
+							m.logger.Warnw("Failed to set volume on sink-input event",
+								"error", err, "target", resolvedTarget)
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 func (m *sessionMap) release() error {
