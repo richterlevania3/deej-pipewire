@@ -176,10 +176,22 @@ func (sf *paSessionFinder) enumerateAndAddSessions(sessions *[]Session) error {
 	}
 
 	for _, info := range reply {
+		// deej keys sessions on the process binary, but some clients register a
+		// stream without application.process.binary (e.g. High Tide on certain
+		// audio backends). Fall back to other stable identifiers so those streams
+		// are still controllable.
 		name, ok := info.Properties["application.process.binary"]
+		if !ok {
+			for _, key := range []string{"node.name", "application.name", "media.name"} {
+				if v, has := info.Properties[key]; has {
+					name, ok = v, true
+					break
+				}
+			}
+		}
 
 		if !ok {
-			sf.logger.Warnw("Failed to get sink input's process name",
+			sf.logger.Warnw("Sink input has no usable identifier, skipping",
 				"sinkInputIndex", info.SinkInputIndex)
 
 			continue

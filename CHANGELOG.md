@@ -46,6 +46,12 @@ session on every cycle and couldn't distinguish a real external change from its
 own output.
 
 
+### Robust stream identification
+Sessions are keyed on `application.process.binary`, but some clients register a
+stream without it (e.g. High Tide on certain audio backends, which sets only
+`node.name`). The finder now falls back to `node.name` -> `application.name` ->
+`media.name`, so such streams stay controllable instead of vanishing from deej.
+
 ### Headless operation
 The system-tray integration is stubbed out so the daemon builds and runs with no
 GTK/AppIndicator dependencies. Stop it with Ctrl+C or `SIGTERM` (or run it under
