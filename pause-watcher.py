@@ -67,14 +67,26 @@ def mpris_players(force=False):
     return players
 
 
-def match_player(app_name, binary, players):
-    """Best-effort match of a sink-input to an MPRIS bus name."""
-    candidates = [app_name.lower(), binary.lower()]
+# Some clients don't expose a name/binary that matches their MPRIS bus. Map a
+# stream identifier (e.g. node.name) to a hint that appears in the bus/Identity.
+# High Tide (Tidal) on some audio backends registers only node.name=python3.13.
+STREAM_ALIASES = {"python3.13": "high-tide"}
+
+
+def match_player(ids, players):
+    """Best-effort match of a sink-input to an MPRIS bus name.
+    ids: list of identifier strings (application.name, process.binary, node.name, media.name)."""
+    candidates = []
+    for c in ids:
+        if not c:
+            continue
+        c = c.lower()
+        candidates.append(c)
+        if c in STREAM_ALIASES:
+            candidates.append(STREAM_ALIASES[c])
     for busname, identity in players.items():
         suffix = busname[len("org.mpris.MediaPlayer2."):].lower()
         for c in candidates:
-            if not c:
-                continue
             if c in suffix or suffix.startswith(c) or (identity and (c in identity or identity in c)):
                 return busname
     return None
@@ -115,27 +127,28 @@ def scan():
         props = si.get("properties", {})
         app = props.get("application.name", "")
         binary = props.get("application.process.binary", "")
+        ids = [app, binary, props.get("node.name", ""), props.get("media.name", "")]
 
         if vol < PAUSE_BELOW and idx not in paused_by_us:
             if players is None:
                 players = mpris_players()
-            busname = match_player(app, binary, players)
+            busname = match_player(ids, players)
             if not busname:
                 # cache may be stale (player just launched) — force one refresh
                 players = mpris_players(force=True)
-                busname = match_player(app, binary, players)
+                busname = match_player(ids, players)
             if not busname:
                 continue
             if playback_status(busname) == "Playing":
                 gdbus_call(busname, "org.mpris.MediaPlayer2.Player.Pause")
                 paused_by_us[idx] = busname
-                log(f"paused {app or binary} ({busname}), stream #{idx} at 0")
+                log(f"paused {app or binary or ids[2] or 'stream'} ({busname}), stream #{idx} at 0")
 
         elif vol > RESUME_ABOVE and idx in paused_by_us:
             busname = paused_by_us.pop(idx)
             if playback_status(busname) == "Paused":
                 gdbus_call(busname, "org.mpris.MediaPlayer2.Player.Play")
-                log(f"resumed {app or binary} ({busname}), stream #{idx} back up")
+                log(f"resumed {app or binary or ids[2] or 'stream'} ({busname}), stream #{idx} back up")
 
     # forget streams that vanished (app closed while paused)
     for idx in [i for i in paused_by_us if i not in seen]:
