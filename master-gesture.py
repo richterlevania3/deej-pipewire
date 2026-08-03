@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
 """master-gesture.py — track-skip gestures on the MASTER (default sink) volume.
 
-Two quick volume-DOWN steps in a row -> Previous track; two quick UP steps ->
-Next track. Meant for a master volume driven by a hardware knob / keyboard
-decoder (not a deej slider). Fires MPRIS Next/Previous via gdbus to the active
-player. Stdlib only (pactl + gdbus), companion to pause-watcher.py.
+Meant for a master volume driven by a ROTARY encoder (not a deej slider). Because
+that same rotary is used for normal volume, the gesture is a deliberate REVERSAL
+("bump") that never happens while steadily turning:
 
-Being stopped is its off switch: it does nothing unless the systemd user service
-master-gesture.service is running.
+    quickly turn DOWN then back up, twice  -> Previous track
+    quickly turn UP then back down, twice   -> Next track
 
-Caveat: master volume doubles as your normal listening control, so a fast normal
-volume change can look like a gesture. STEP_WINDOW is deliberately tight and a
-COOLDOWN prevents repeats; tune below if it mis-fires. A reversal-based variant
-(down-then-back "bump") is possible if same-direction proves too twitchy.
+Each down-then-back is a "valley", each up-then-back a "peak"; two of the same
+kind within DOUBLE_WINDOW fires the action over MPRIS (gdbus) to the active
+player. Steadily turning the knob one way only (normal volume change) produces no
+reversal, so it never mis-fires.
+
+Stdlib only (pactl + gdbus), companion to pause-watcher.py. Being stopped is its
+off switch — nothing happens unless master-gesture.service is running.
 """
 import subprocess
 import sys
 import re
 import time
 
-# --- tuning ---
-STEP_WINDOW = 0.45   # max seconds between the two steps to count as a gesture
-COOLDOWN = 0.9       # seconds to ignore input after firing
-MIN_STEP = 0.01      # ignore volume changes smaller than this (fraction 0-1)
+# --- tuning (all seconds / 0-1 volume fractions) ---
+JOG_DELTA = 0.03      # min depth of one down/up leg to count (a rotary click ~ few %)
+JOG_WINDOW = 0.35     # each leg (the down, or the back-up) must complete this fast
+DOUBLE_WINDOW = 1.2   # the two bumps must land within this
+COOLDOWN = 0.8        # ignore input after firing
+MEMORY = 1.5          # forget turning points older than this
+IDLE_RESET = 0.6      # a gap longer than this drops any in-progress bump
+MIN_CHANGE = 0.004    # ignore volume jitter smaller than this
 
 
 def log(*a):
@@ -80,45 +86,77 @@ def fire(direction):  # -1 = previous, +1 = next
     log("fired", method, "->", bus)
 
 
+class JogDetector:
+    def __init__(self):
+        self.have = False
+        self.last_v = 0.0
+        self.last_t = 0.0
+        self.dir = 0            # current leg direction: +1 up, -1 down, 0 none
+        self.piv_v = 0.0
+        self.piv_t = 0.0
+        self.points = []        # list of (kind, t): kind -1 valley, +1 peak
+        self.fired_t = 0.0
+
+    def feed(self, v, t):
+        if not self.have:
+            self.have, self.last_v, self.last_t = True, v, t
+            self.piv_v, self.piv_t = v, t
+            return
+
+        # a long gap means whatever motion was in progress is abandoned
+        if t - self.last_t > IDLE_RESET:
+            self.last_v, self.last_t = v, t
+            self.dir = 0
+            self.piv_v, self.piv_t = v, t
+            return
+
+        delta = v - self.last_v
+        if abs(delta) < MIN_CHANGE:
+            self.last_v = v
+            return
+
+        inst = -1 if delta < 0 else 1
+        if self.dir == 0:
+            self.piv_v, self.piv_t = self.last_v, self.last_t
+            self.dir = inst
+        elif inst != self.dir:
+            leg_amp = abs(self.last_v - self.piv_v)
+            leg_dur = self.last_t - self.piv_t
+            if leg_amp >= JOG_DELTA and leg_dur <= JOG_WINDOW:
+                self._register(self.dir, self.last_t)  # dir -1 leg -> valley, +1 -> peak
+            self.piv_v, self.piv_t = self.last_v, self.last_t
+            self.dir = inst
+
+        self.last_v, self.last_t = v, t
+
+    def _register(self, kind, t):
+        self.points = [p for p in self.points if p[1] > t - MEMORY]
+        self.points.append((kind, t))
+        if t - self.fired_t < COOLDOWN:
+            return
+        valleys = sum(1 for k, pt in self.points if k < 0 and t - pt <= DOUBLE_WINDOW)
+        peaks = sum(1 for k, pt in self.points if k > 0 and t - pt <= DOUBLE_WINDOW)
+        if valleys >= 2:
+            fire(-1)
+            self.fired_t, self.points = t, []
+        elif peaks >= 2:
+            fire(+1)
+            self.fired_t, self.points = t, []
+
+
 def main():
-    last_vol = master_volume()
-    last_t = time.time()
-    streak_dir = 0
-    streak_count = 0
-    last_fire = 0.0
-
+    det = JogDetector()
+    v0 = master_volume()
+    if v0 is not None:
+        det.feed(v0, time.time())
     proc = subprocess.Popen(["pactl", "subscribe"], stdout=subprocess.PIPE, text=True)
-    log("watching master volume; two quick downs=Previous, two quick ups=Next")
-
+    log("watching master volume (rotary): down-bump x2 = Previous, up-bump x2 = Next")
     for line in proc.stdout:
         if "on sink " not in line and "on server" not in line:
             continue
         v = master_volume()
-        if v is None:
-            continue
-        t = time.time()
-        if last_vol is None:
-            last_vol, last_t = v, t
-            continue
-
-        dv = v - last_vol
-        if abs(dv) < MIN_STEP:
-            last_vol = v
-            continue
-
-        d = -1 if dv < 0 else 1
-        dt = t - last_t
-        if d == streak_dir and dt <= STEP_WINDOW:
-            streak_count += 1
-        else:
-            streak_dir, streak_count = d, 1
-
-        if streak_count >= 2 and (t - last_fire) > COOLDOWN:
-            fire(d)
-            last_fire = t
-            streak_dir, streak_count = 0, 0
-
-        last_vol, last_t = v, t
+        if v is not None:
+            det.feed(v, time.time())
 
 
 if __name__ == "__main__":
