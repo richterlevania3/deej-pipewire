@@ -37,12 +37,6 @@ type CanonicalConfig struct {
 
 	FastSessionDetection bool
 
-	TrackGesturesEnabled bool
-
-	TrackGestureSlider int
-
-	TrackGesturePlayer string
-
 	logger             *zap.SugaredLogger
 	notifier           Notifier
 	stopWatcherChannel chan bool
@@ -75,9 +69,6 @@ const (
 	configKeyMaxSessionRefreshInterval = "max_session_refresh_interval"
 	configKeyFastSessionDetection      = "fast_session_detection"
 	configKeyVolumeCurve               = "volume_curve"
-	configKeyTrackGesturesEnabled      = "track_gestures_enabled"
-	configKeyTrackGestureSlider        = "track_gesture_slider"
-	configKeyTrackGesturePlayer        = "track_gesture_player"
 
 	defaultCOMPort  = "COM4"
 	defaultBaudRate = 9600
@@ -120,9 +111,6 @@ func NewConfig(logger *zap.SugaredLogger, notifier Notifier) (*CanonicalConfig, 
 	userConfig.SetDefault(configKeyMaxSessionRefreshInterval, 45)
 	userConfig.SetDefault(configKeyFastSessionDetection, false)
 	userConfig.SetDefault(configKeyVolumeCurve, defaultVolumeCurve)
-	userConfig.SetDefault(configKeyTrackGesturesEnabled, false)
-	userConfig.SetDefault(configKeyTrackGestureSlider, 2)
-	userConfig.SetDefault(configKeyTrackGesturePlayer, "high-tide")
 
 	internalConfig := viper.New()
 	internalConfig.SetConfigName(internalConfigName)
@@ -278,9 +266,6 @@ func (cc *CanonicalConfig) populateFromVipers() error {
 	cc.SessionRefreshInterval = cc.userConfig.GetInt(configKeySessionRefreshInterval)
 	cc.MaxSessionRefreshInterval = cc.userConfig.GetInt(configKeyMaxSessionRefreshInterval)
 	cc.FastSessionDetection = cc.userConfig.GetBool(configKeyFastSessionDetection)
-	cc.TrackGesturesEnabled = cc.userConfig.GetBool(configKeyTrackGesturesEnabled)
-	cc.TrackGestureSlider = cc.userConfig.GetInt(configKeyTrackGestureSlider)
-	cc.TrackGesturePlayer = cc.userConfig.GetString(configKeyTrackGesturePlayer)
 
 	cc.logger.Debugw("Loaded session refresh config",
 		"SessionRefreshInterval", cc.SessionRefreshInterval,

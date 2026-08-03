@@ -45,15 +45,14 @@ comparison never matched the (curved) stored value, so deej re-wrote every
 session on every cycle and couldn't distinguish a real external change from its
 own output.
 
-### Track-skip slider gestures
-Jog a slider down-and-back twice quickly to go to the previous track, up-and-back
-twice for the next — on top of the existing pause-at-0. A "jog" is a fast move of
-at least `gestureJogDelta` that reverses within `gestureJogWindow` (a valley for
-down, a peak for up); two of the same kind within `gestureDoubleWindow` fire
-`Previous`/`Next` over MPRIS via `gdbus`. Config: `track_gestures_enabled`
-(default false), `track_gesture_slider` (default 2), `track_gesture_player` (MPRIS
-bus-name substring, default `high-tide`). Disabled by default — fires nothing
-until enabled.
+### `master-gesture.py` — track-skip from the master volume
+A stdlib-only companion daemon (`pactl` + `gdbus`) that watches the **master
+(default sink) volume** — meant for a hardware knob / keyboard decoder, not a deej
+slider. Two quick volume-down steps in a row send `Previous`; two quick up steps
+send `Next`, over MPRIS to the active player (prefers whatever is Playing, then
+Tidal/High Tide). Tunables (`STEP_WINDOW`, `COOLDOWN`, `MIN_STEP`) are constants
+at the top. Ships a systemd user unit (`contrib/systemd/master-gesture.service`);
+it does nothing unless that service is running.
 
 ### Headless operation
 The system-tray integration is stubbed out so the daemon builds and runs with no

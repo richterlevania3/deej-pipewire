@@ -23,8 +23,6 @@ type sessionMap struct {
 
 	lastSessionRefresh time.Time
 	unmappedSessions   []Session
-
-	gestures *trackGestures
 }
 
 const (
@@ -67,8 +65,6 @@ func (m *sessionMap) initialize() error {
 		m.logger.Warnw("Failed to get all sessions during session map initialization", "error", err)
 		return fmt.Errorf("get all sessions during init: %w", err)
 	}
-
-	m.gestures = newTrackGestures(m.deej, m.logger)
 
 	m.setupOnConfigReload()
 	m.setupOnSliderMove()
@@ -341,11 +337,6 @@ func (m *sessionMap) sessionMapped(session Session) bool {
 }
 
 func (m *sessionMap) handleSliderMoveEvent(event SliderMoveEvent) {
-
-	// feed the track-skip gesture detector (no-op unless enabled for this slider)
-	if m.gestures != nil {
-		m.gestures.feed(event.SliderID, event.PercentValue)
-	}
 
 	// Get the maximum time between refreshes from config, with fallback to default
 	maxTimeBetweenRefreshes := time.Duration(m.deej.config.MaxSessionRefreshInterval) * time.Second

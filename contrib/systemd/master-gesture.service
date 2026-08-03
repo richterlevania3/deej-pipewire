@@ -1,0 +1,12 @@
+[Unit]
+Description=Master-volume track-skip gestures (deej rig)
+After=pipewire.service pipewire-pulse.service wireplumber.service
+Wants=pipewire.service
+
+[Service]
+ExecStart=/usr/bin/python3 %h/deej-pipewire/master-gesture.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

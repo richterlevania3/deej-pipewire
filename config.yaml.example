@@ -42,9 +42,3 @@ noise_reduction: fine
 session_refresh_interval: 10
 fast_session_detection: true
 
-# Track-skip gestures (this fork). Jog a slider down-and-back twice quickly for
-# the previous track, up-and-back twice for the next track (plus the existing
-# pause-at-0 via pause-watcher.py). Fires Next/Previous over MPRIS (gdbus).
-track_gestures_enabled: false      # off by default
-track_gesture_slider: 2            # which slider carries the gesture
-track_gesture_player: "high-tide"  # substring of the MPRIS bus name to target
