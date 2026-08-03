@@ -45,15 +45,6 @@ comparison never matched the (curved) stored value, so deej re-wrote every
 session on every cycle and couldn't distinguish a real external change from its
 own output.
 
-### `master-gesture.py` — track-skip from the master volume
-A stdlib-only companion daemon (`pactl` + `gdbus`) that watches the **master
-(default sink) volume** — meant for a hardware knob / keyboard decoder, not a deej
-slider. Designed for a rotary encoder that also does normal volume: a deliberate REVERSAL
-(quickly turn down-then-back twice = `Previous`, up-then-back twice = `Next`) which
-never happens while steadily turning, so it can't mis-fire during volume changes.
-Sends over MPRIS to the active player (prefers whatever is Playing, then Tidal).
-Tunables are constants at the top of the file. Ships a systemd user unit (`contrib/systemd/master-gesture.service`);
-it does nothing unless that service is running.
 
 ### Headless operation
 The system-tray integration is stubbed out so the daemon builds and runs with no
