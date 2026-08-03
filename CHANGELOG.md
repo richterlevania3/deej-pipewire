@@ -45,6 +45,16 @@ comparison never matched the (curved) stored value, so deej re-wrote every
 session on every cycle and couldn't distinguish a real external change from its
 own output.
 
+### Track-skip slider gestures
+Jog a slider down-and-back twice quickly to go to the previous track, up-and-back
+twice for the next — on top of the existing pause-at-0. A "jog" is a fast move of
+at least `gestureJogDelta` that reverses within `gestureJogWindow` (a valley for
+down, a peak for up); two of the same kind within `gestureDoubleWindow` fire
+`Previous`/`Next` over MPRIS via `gdbus`. Config: `track_gestures_enabled`
+(default false), `track_gesture_slider` (default 2), `track_gesture_player` (MPRIS
+bus-name substring, default `high-tide`). Disabled by default — fires nothing
+until enabled.
+
 ### Headless operation
 The system-tray integration is stubbed out so the daemon builds and runs with no
 GTK/AppIndicator dependencies. Stop it with Ctrl+C or `SIGTERM` (or run it under
